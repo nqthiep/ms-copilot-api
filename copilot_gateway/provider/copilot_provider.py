@@ -25,7 +25,7 @@ log = get_logger("provider")
 
 CONVERSATION_FILE = "conversation.txt"
 OVERFLOW_PROMPT = (
-    f"The full conversation is in the attached file {CONVERSATION_FILE}. "
+    f"The message is in the attached file {CONVERSATION_FILE}. "
     "Reply only to its last USER message."
 )
 

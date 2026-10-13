@@ -60,8 +60,11 @@ def test_second_turn_reuses_the_thread(mock_base_url, settings_factory):
     first, second = asyncio.run(scenario())
 
     assert first.startswith("turn 1:")
+    # The last line of the multi-line prompt must arrive. A truncated send would stop at the first line.
+    assert "last line: Reply only to the last USER message." in first
     # Turn 2 proves the thread was reused. A fresh thread would count only one turn.
     assert second.startswith("turn 2:")
+    assert "last line: again" in second
     # Code fences survive extraction, so agents like Aider can still parse the reply.
     assert "```python\nprint(1)\n```" in first
 

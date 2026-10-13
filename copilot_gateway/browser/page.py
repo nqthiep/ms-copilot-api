@@ -78,7 +78,9 @@ class CopilotPage:
         """Type and submit a message. Returns how many response items existed before sending."""
         baseline = await self._page.locator(self._sel.response_item).count()
         box = self._page.locator(self._sel.chat_input).first
-        await box.fill(text)
+        await box.fill("")
+        await box.click()
+        await self._type_multiline(text)
         send = self._page.locator(self._sel.send_button)
         if await send.count():
             await send.first.click()
@@ -86,6 +88,15 @@ class CopilotPage:
             # The send button may only render once the box has text. Enter submits in Copilot.
             await box.press("Enter")
         return baseline
+
+    async def _type_multiline(self, text: str) -> None:
+        # In Copilot, Enter sends the message, so each line break is Shift+Enter.
+        # fill() with newlines sent only the first line on the live page.
+        for index, line in enumerate(text.split("\n")):
+            if index:
+                await self._page.keyboard.press("Shift+Enter")
+            if line:
+                await self._page.keyboard.insert_text(line)
 
     async def read_response(self, baseline: int) -> str:
         """Wait until a new response has finished streaming, then return its text.

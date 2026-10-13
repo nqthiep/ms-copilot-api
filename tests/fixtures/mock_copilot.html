@@ -17,7 +17,8 @@
   <div id="composer">
     <span id="chips"></span>
     <button aria-label="Add and manage sources" data-testid="PlusMenuButton" id="attach">+</button>
-    <textarea aria-label="Message Copilot" id="input" rows="3"></textarea>
+    <span role="textbox" contenteditable="true" aria-label="Message Copilot" id="input"
+          style="display:block; min-height:24px; border:1px solid #ccc; white-space:pre-wrap"></span>
     <button aria-label="Send" id="send">Send</button>
   </div>
   <script>
@@ -68,8 +69,16 @@
 
     let busy = false;  // hashchange must not re-render the reply that is streaming
 
+    // Like Copilot: Enter sends, Shift+Enter inserts a line break.
+    $("input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        $("send").click();
+      }
+    });
+
     $("send").addEventListener("click", async () => {
-      const text = $("input").value;
+      const text = $("input").innerText;
       if (!text.trim()) return;
       busy = true;
       if (!currentId()) location.hash = "#/chat/" + Math.random().toString(36).slice(2, 10);
@@ -84,13 +93,14 @@
       t[id].push({ role: "user", html: escapeHtml(text) });
       saveThreads(t);
       render();
-      $("input").value = "";
+      $("input").innerText = "";
 
       // The reply reports which turn of this thread it is, so a test can tell whether
       // the thread was reused. It also reports the attachment names it received.
       const userTurns = t[id].filter((m) => m.role === "user").length;
       const names = files.length ? files.join(", ") : "none";
-      const full = `turn ${userTurns}: ACK; attachments: ${names}`;
+      const lastLine = text.trim().split("\n").pop();
+      const full = `turn ${userTurns}: ACK; last line: ${lastLine}; attachments: ${names}`;
 
       const stop = document.createElement("button");
       stop.setAttribute("aria-label", "Stop generating");

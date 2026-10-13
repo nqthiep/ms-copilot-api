@@ -82,6 +82,10 @@ Model ID above:
 | `m365-think-deeper` | Reasoning model                    |
 | `claude-sonnet`   | Claude Sonnet via Copilot            |
 
+Each ID maps to an internal Copilot `tone`. Microsoft retires tones freely — if a
+model stops working with a `Failed to invoke 'Chat'` error, its mapping needs
+updating.
+
 ## 4. How Agent mode works here
 
 M365 Copilot has no native function-calling API, so the gateway emulates it:
@@ -114,3 +118,12 @@ Copilot conversation automatically.
 - **The model is not in the picker** — re-run **Chat: Manage Language Models**
   and check the URL has no trailing slash issues; the gateway also serves the
   unprefixed `/chat/completions` alias.
+
+## Disclaimer
+
+This setup drives Microsoft 365 Copilot through an undocumented,
+reverse-engineered API while impersonating Microsoft's first-party client.
+Microsoft may change, throttle, or block it without notice. The gateway is not
+affiliated with Microsoft or GitHub and is provided as-is, without warranty.
+You are responsible for complying with Microsoft's Terms of Service, your
+Copilot license terms, and your organization's IT/security policies.

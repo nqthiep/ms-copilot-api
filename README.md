@@ -161,7 +161,10 @@ used when a variable is missing.
   gateway returns OpenAI-style `tool_calls`. The client's `role: tool` results feed back as
   follow-up turns. This is what makes VSCode's Agent mode work.
 - **Models.** `GET /v1/models` lists `m365-copilot` (default), `copilot-web` (alias),
-  `m365-quick`, `m365-think-deeper`, and `claude-sonnet`.
+  `m365-quick` (fast answers), `m365-think-deeper` (reasoning), and `claude-sonnet`.
+  Each id maps to an internal Copilot `tone`; Microsoft retires tones freely, so a
+  model that stops working with a `Failed to invoke 'Chat'` error needs its mapping
+  updated — please report it.
 - **Retries.** Empty replies, protocol errors, and network failures are retried on a fresh
   conversation. A rejected token triggers one silent refresh before surfacing a 401.
 
@@ -176,6 +179,22 @@ used when a variable is missing.
   `storage/` like a credential.
 - **Latency.** Each turn opens a fresh WebSocket; expect a small handshake overhead.
 - **Undocumented API.** Microsoft can change the protocol without notice.
+
+## Disclaimer
+
+- **Undocumented API.** This project talks to Microsoft 365 Copilot through an
+  undocumented, reverse-engineered API while impersonating Microsoft's own first-party
+  client. Microsoft can change, throttle, or block it at any time without notice, and
+  there is no guarantee it keeps working.
+- **No affiliation.** A personal, unofficial project. Not affiliated with, endorsed,
+  or supported by Microsoft or GitHub.
+- **Your responsibility.** How you use it is on you: make sure it complies with
+  Microsoft's Terms of Service, your Copilot license terms, and your organization's
+  IT/security policies — especially if your company blocked LLM APIs on purpose.
+  The refresh token in `storage/tokens.json` is a live credential: protect it like
+  a password and never commit it.
+- **As is.** Provided as-is, without warranty of any kind. Model behavior,
+  availability, quotas, and rate limits are entirely up to Microsoft.
 
 ## Tests
 

@@ -11,11 +11,11 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Selectors:
     chat_input: str = 'textarea[aria-label*="Message" i], [role="textbox"][aria-label*="Message" i]'
-    send_button: str = 'button[aria-label*="Send" i]'
-    stop_button: str = 'button[aria-label*="Stop" i]'
-    response_item: str = '[data-content="ai-message"]'
-    new_thread_button: str = 'button[aria-label*="New" i]'
-    attach_button: str = 'button[aria-label*="Attach" i]'
+    send_button: str = 'button[aria-label*="Send" i]'  # confirmed: DevTools dump
+    stop_button: str = 'button[aria-label*="Stop" i]'  # unverified
+    response_item: str = '[data-testid="copilot-message-reply-div"]'  # candidate, not yet confirmed
+    new_thread_button: str = 'button[aria-label*="New" i]'  # not found on the live page; falls back to home URL
+    attach_button: str = 'button[data-testid="PlusMenuButton"]'  # confirmed: DevTools dump
     file_input: str = 'input[type="file"]'
 
 

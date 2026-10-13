@@ -16,9 +16,9 @@
   <div id="log"></div>
   <div id="composer">
     <span id="chips"></span>
-    <button aria-label="Attach file" id="attach">+</button>
+    <button aria-label="Add and manage sources" data-testid="PlusMenuButton" id="attach">+</button>
     <textarea aria-label="Message Copilot" id="input" rows="3"></textarea>
-    <button aria-label="Send message" id="send">Send</button>
+    <button aria-label="Send" id="send">Send</button>
   </div>
   <script>
     const STORE = "mockThreads";
@@ -36,7 +36,8 @@
       if (!id) return;
       for (const m of threads()[id] || []) {
         const div = document.createElement("div");
-        div.setAttribute("data-content", m.role === "user" ? "user-message" : "ai-message");
+        if (m.role === "user") div.setAttribute("data-content", "user-message");
+        else div.setAttribute("data-testid", "copilot-message-reply-div");
         div.innerHTML = m.html;
         $("log").appendChild(div);
       }
@@ -97,7 +98,7 @@
       $("composer").appendChild(stop);
 
       const wrap = document.createElement("div");
-      wrap.setAttribute("data-content", "ai-message");
+      wrap.setAttribute("data-testid", "copilot-message-reply-div");
       const p = document.createElement("p");
       wrap.appendChild(p);
       $("log").appendChild(wrap);

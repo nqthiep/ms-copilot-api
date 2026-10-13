@@ -45,6 +45,7 @@ async def list_models() -> ModelList:
 
 @router.post("/v1/chat/completions", response_model=None)
 async def chat_completions(
+    request: Request,
     body: ChatCompletionRequest,
     provider: ChatProvider = Depends(get_provider),
     settings: Settings = Depends(get_settings),
@@ -58,6 +59,13 @@ async def chat_completions(
         raise BadRequest("At least one user message is required")
     session_key = resolve_session_key(x_session_id or body.user, messages)
     prompt_chars = sum(len(m.text) for m in messages)
+    # Header names only, never values, so credentials are not logged.
+    log.info(
+        "request=%s header_names=%s has_user_field=%s",
+        request_id,
+        sorted(request.headers.keys()),
+        body.user is not None,
+    )
 
     log.info(
         "request=%s session=%s prompt_chars=%d files=%d stream=%s",

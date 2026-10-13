@@ -21,6 +21,7 @@ class BrowserSession:
         self._page: Page | None = None
 
     async def start(self) -> None:
+        log.info("Browser profile: %s", self._settings.profile_dir)
         self._playwright = await async_playwright().start()
         await self._launch()
 

@@ -33,7 +33,9 @@ def load_settings() -> Settings:
         host=host,
         port=int(os.getenv("GATEWAY_PORT", "8000")),
         copilot_url=os.getenv("COPILOT_URL", "https://copilot.cloud.microsoft/"),
-        profile_dir=Path(os.getenv("PLAYWRIGHT_PROFILE_DIR", "playwright-profile")).resolve(),
+        profile_dir=Path(
+            os.getenv("PLAYWRIGHT_PROFILE_DIR", PACKAGE_DIR.parent / "playwright-profile")
+        ).resolve(),
         sessions_path=Path(
             os.getenv("SESSIONS_PATH", PACKAGE_DIR / "storage" / "sessions.json")
         ).resolve(),

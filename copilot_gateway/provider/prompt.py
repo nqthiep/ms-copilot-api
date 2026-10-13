@@ -1,7 +1,5 @@
 import base64
 import binascii
-import hashlib
-import json
 import os
 from dataclasses import dataclass
 
@@ -85,26 +83,13 @@ def _format_turn(message: NormalizedMessage) -> str:
     return f"{label}:\n{message.text}"
 
 
-def prefix_hash(messages: list[NormalizedMessage]) -> str:
-    canonical = [
-        [m.role, m.text, [f.filename for f in m.files]] for m in messages
-    ]
-    return hashlib.sha256(json.dumps(canonical).encode("utf-8")).hexdigest()
+def pending_user_turns(messages: list[NormalizedMessage], sent: int) -> list[NormalizedMessage]:
+    """The user messages the Copilot thread has not received yet.
 
-
-def continuation_delta(
-    messages: list[NormalizedMessage], stored_count: int, stored_hash: str
-) -> list[NormalizedMessage] | None:
-    """Return the new user messages if the thread still matches the stored prefix.
-
-    Returns None when the thread cannot be reused: the client rewrote history,
-    sent no new message, or the new messages are not plain user turns.
+    `sent` is how many user turns the thread already holds. A client that resends the
+    whole history gets only its new turns. A client that sends just the newest message
+    gets that message, because at least one turn is always sent.
     """
-    if stored_count <= 0 or len(messages) <= stored_count:
-        return None
-    if prefix_hash(messages[:stored_count]) != stored_hash:
-        return None
-    delta = messages[stored_count:]
-    if any(m.role != "user" for m in delta):
-        return None
-    return delta
+    users = [m for m in messages if m.role == "user"]
+    count = max(len(users) - sent, 1)
+    return users[-count:]

@@ -13,6 +13,6 @@ def test_new_chat_whose_url_never_changed_is_not_stored():
 
 
 def test_continued_thread_keeps_its_stored_url():
-    state = ThreadState(thread_url="https://x/chat/abc", message_count=3, prefix_hash="h")
+    state = ThreadState(thread_url="https://x/chat/abc", user_turns=1)
 
     assert _thread_url_after_turn("continue", state, "https://x/chat/abc", "https://x/chat/abc") == "https://x/chat/abc"

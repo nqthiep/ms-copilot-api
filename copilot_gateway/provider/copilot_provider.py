@@ -15,9 +15,8 @@ from copilot_gateway.provider.prompt import (
     AttachedFile,
     NormalizedMessage,
     compile_prompt,
-    continuation_delta,
     format_user_turns,
-    prefix_hash,
+    pending_user_turns,
 )
 from copilot_gateway.storage.store import SessionStore, ThreadState
 from copilot_gateway.utils.logging import get_logger
@@ -119,22 +118,22 @@ class CopilotProvider(ChatProvider):
         await self._ensure_home()
         copilot = CopilotPage(await self._browser.page(), self._settings)
 
+        # The session key decides the thread. Only turns the thread has not seen are sent.
         state = None if fresh_thread else self._store.get(session_key)
-        delta = None
         if state is not None and state.thread_url is not None:
-            delta = continuation_delta(messages, state.message_count, state.prefix_hash)
-
-        if delta is not None and state is not None and state.thread_url is not None:
             if copilot.url != state.thread_url:
                 await copilot.open_thread(state.thread_url)
-            turn_text = format_user_turns(delta)
-            turn_files = _files_of(delta)
+            turns = pending_user_turns(messages, state.user_turns)
+            turn_text = format_user_turns(turns)
+            sent_before = state.user_turns
             mode = "continue"
         else:
             await copilot.create_thread()
+            turns = [m for m in messages if m.role == "user"]
             turn_text = compile_prompt(messages)
-            turn_files = _files_of(messages)
+            sent_before = 0
             mode = "new-thread"
+        turn_files = _files_of(turns)
 
         with tempfile.TemporaryDirectory(prefix="copilot-gw-") as tmp:
             paths = _write_files(Path(tmp), turn_files)
@@ -160,13 +159,11 @@ class CopilotProvider(ChatProvider):
         if not reply.strip():
             raise EmptyResponse("Copilot returned an empty response")
 
-        stored = messages + [NormalizedMessage(role="assistant", text=reply)]
         self._store.put(
             session_key,
             ThreadState(
                 thread_url=_thread_url_after_turn(mode, state, url_before_send, copilot.url),
-                message_count=len(stored),
-                prefix_hash=prefix_hash(stored),
+                user_turns=sent_before + len(turns),
             ),
         )
         self._dirty = False

@@ -12,10 +12,8 @@ log = get_logger("store")
 class ThreadState:
     # Copilot thread URL, or None when Copilot has not assigned one yet.
     thread_url: str | None
-    # Number of conversation messages (including the last assistant reply) that
-    # the thread already contains, and a hash of them to detect divergence.
-    message_count: int
-    prefix_hash: str
+    # How many user turns the thread has received so far.
+    user_turns: int
 
 
 class SessionStore:
@@ -27,7 +25,13 @@ class SessionStore:
 
     def get(self, key: str) -> ThreadState | None:
         entry = self._load().get(key)
-        return ThreadState(**entry) if entry else None
+        if entry is None:
+            return None
+        try:
+            return ThreadState(**entry)
+        except TypeError:
+            # Entry written by an older version of the gateway. Treat it as a new session.
+            return None
 
     def put(self, key: str, state: ThreadState) -> None:
         self._load()[key] = asdict(state)

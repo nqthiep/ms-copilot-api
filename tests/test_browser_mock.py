@@ -69,21 +69,28 @@ def test_second_turn_reuses_the_thread(mock_base_url, settings_factory):
     assert "```python\nprint(1)\n```" in first
 
 
-def test_rewritten_history_starts_a_fresh_thread(mock_base_url, settings_factory):
+def test_stateless_requests_share_one_thread_per_session(mock_base_url, settings_factory):
+    # curl-style clients send only the newest message, with no history.
     settings = settings_factory(f"{mock_base_url}/mock_copilot.html")
 
     async def scenario():
         provider = CopilotProvider(settings, store=SessionStore(settings.sessions_path))
         await provider.start()
         try:
-            await provider.complete("s2", [user("hello")])
-            return await provider.complete("s2", [user("hello"), assistant("edited"), user("again")])
+            first = await provider.complete("s2", [user("hello")])
+            second = await provider.complete("s2", [user("again")])
+            other_session = await provider.complete("s3", [user("hello")])
+            return first, second, other_session
         finally:
             await provider.stop()
 
-    reply = asyncio.run(scenario())
+    first, second, other_session = asyncio.run(scenario())
 
-    assert reply.startswith("turn 1:")
+    assert first.startswith("turn 1:")
+    assert second.startswith("turn 2:")
+    assert "last line: again" in second
+    # A different session key gets its own thread.
+    assert other_session.startswith("turn 1:")
 
 
 def test_attached_files_reach_the_page(mock_base_url, settings_factory):

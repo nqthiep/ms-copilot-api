@@ -8,9 +8,8 @@ from copilot_gateway.provider.prompt import (
     AttachedFile,
     NormalizedMessage,
     compile_prompt,
-    continuation_delta,
     normalize_messages,
-    prefix_hash,
+    pending_user_turns,
 )
 
 
@@ -83,25 +82,21 @@ def test_invalid_files_are_rejected(filename, file_data, message_part):
         normalize_messages([message], max_file_bytes=10)
 
 
-def test_continuation_delta_returns_only_new_user_turns():
-    history = [NormalizedMessage("user", "a"), NormalizedMessage("assistant", "b")]
-    stored_hash = prefix_hash(history)
-    new_turn = NormalizedMessage("user", "c")
+def test_pending_turns_are_the_user_messages_after_those_already_sent():
+    messages = [
+        NormalizedMessage("user", "a"),
+        NormalizedMessage("assistant", "b"),
+        NormalizedMessage("user", "c"),
+        NormalizedMessage("assistant", "d"),
+        NormalizedMessage("user", "e"),
+    ]
 
-    assert continuation_delta(history + [new_turn], 2, stored_hash) == [new_turn]
-
-
-def test_continuation_delta_refuses_when_history_diverged():
-    history = [NormalizedMessage("user", "a"), NormalizedMessage("assistant", "b")]
-    stored_hash = prefix_hash(history)
-    edited = [NormalizedMessage("user", "a"), NormalizedMessage("assistant", "edited"), NormalizedMessage("user", "c")]
-
-    assert continuation_delta(edited, 2, stored_hash) is None
+    assert pending_user_turns(messages, 2) == [NormalizedMessage("user", "e")]
+    assert pending_user_turns(messages, 1) == [NormalizedMessage("user", "c"), NormalizedMessage("user", "e")]
+    assert pending_user_turns(messages, 0) == [NormalizedMessage("user", t) for t in ("a", "c", "e")]
 
 
-def test_continuation_delta_refuses_without_new_message_or_with_non_user_turns():
-    history = [NormalizedMessage("user", "a"), NormalizedMessage("assistant", "b")]
-    stored_hash = prefix_hash(history)
+def test_stateless_client_sends_its_newest_message_every_time():
+    newest = NormalizedMessage("user", "again")
 
-    assert continuation_delta(history, 2, stored_hash) is None
-    assert continuation_delta(history + [NormalizedMessage("assistant", "x")], 2, stored_hash) is None
+    assert pending_user_turns([newest], 5) == [newest]

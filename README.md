@@ -106,9 +106,13 @@ To keep each agent conversation in its own Copilot thread, send an `X-Session-Id
 
 ## How it works
 
-- **Thread per conversation.** A session key maps to a Copilot thread URL in
-  `copilot_gateway/storage/sessions.json`. When the next request extends the stored history, only
-  the new user message is sent. If the history was rewritten, a new thread gets the full prompt.
+- **One session, one thread.** The session key (the `X-Session-Id` header, the `user` field, or a
+  fingerprint of the first message) maps to one Copilot thread URL in
+  `copilot_gateway/storage/sessions.json`. Each request sends only the user turns the thread has not
+  seen yet. A new session key, or a session whose thread URL was never recorded, starts a new thread
+  with the full prompt.
+- Without `X-Session-Id`, requests whose first message is identical share a thread. Send a distinct
+  `X-Session-Id` to keep unrelated conversations apart.
 - **Prompt format.** New threads get `SYSTEM / CONVERSATION / USER: / ASSISTANT:` as one prompt.
 - **Files.** Content parts of type `file` (`.py .md .txt .docx .pdf .json .yaml .yml`) are
   attached to Copilot through its file input. The gateway does not parse them.

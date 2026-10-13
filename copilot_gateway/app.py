@@ -22,6 +22,10 @@ def create_app(settings: Settings | None = None, provider: ChatProvider | None =
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         log.info("Starting gateway on %s:%d", settings.host, settings.port)
+        log.info(
+            "Inline limit %d characters; longer messages are attached as a file",
+            settings.max_inline_chars,
+        )
         await provider.start()
         try:
             yield

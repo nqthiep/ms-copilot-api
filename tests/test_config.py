@@ -32,6 +32,12 @@ def test_values_are_read_from_the_env_file(monkeypatch, tmp_path):
     assert settings.headless is True
 
 
+def test_inline_limit_defaults_to_2000_characters(monkeypatch, tmp_path):
+    monkeypatch.delenv("MAX_INLINE_CHARS", raising=False)
+
+    assert load_settings(tmp_path / "none.env").max_inline_chars == 2000
+
+
 def test_hide_when_ready_is_off_by_default(monkeypatch, tmp_path):
     monkeypatch.delenv("HIDE_WHEN_READY", raising=False)
 

@@ -60,6 +60,6 @@ def load_settings(env_file: Path = ENV_FILE) -> Settings:
         max_retry=int(os.getenv("MAX_RETRY", "3")),
         login_timeout=float(os.getenv("LOGIN_TIMEOUT", "600")),
         stable_seconds=float(os.getenv("RESPONSE_STABLE_SECONDS", "3")),
-        max_inline_chars=int(os.getenv("MAX_INLINE_CHARS", "30000")),
+        max_inline_chars=int(os.getenv("MAX_INLINE_CHARS", "2000")),
         max_file_bytes=int(os.getenv("MAX_FILE_BYTES", str(20 * 1024 * 1024))),
     )

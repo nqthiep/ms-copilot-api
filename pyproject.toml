@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "pydantic>=2.6",
     "playwright>=1.44",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

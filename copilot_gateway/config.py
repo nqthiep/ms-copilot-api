@@ -2,8 +2,11 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 PACKAGE_DIR = Path(__file__).resolve().parent
+ENV_FILE = PACKAGE_DIR.parent / ".env"
 
 
 @dataclass(frozen=True)
@@ -24,7 +27,9 @@ class Settings:
     max_file_bytes: int
 
 
-def load_settings() -> Settings:
+def load_settings(env_file: Path = ENV_FILE) -> Settings:
+    # Variables already set in the environment win over values in the file.
+    load_dotenv(env_file)
     host = os.getenv("GATEWAY_HOST", "127.0.0.1")
     if host not in LOOPBACK_HOSTS:
         raise ValueError(f"GATEWAY_HOST must be a loopback address, got {host!r}")

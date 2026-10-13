@@ -26,6 +26,15 @@ pip install -e ".[dev]"
 playwright install chromium      # or set CHROMIUM_PATH to an existing Chromium binary
 ```
 
+Create your local settings file from the template. `.env` is git-ignored, so it stays on your machine:
+
+```powershell
+Copy-Item .env.example .env      # Windows PowerShell
+```
+
+Edit `.env` to change the port or the headless setting. Real environment variables override it, so
+close any shell where you ran `$env:HEADLESS = ...` before.
+
 ## First run
 
 ```bash
@@ -93,6 +102,9 @@ To keep each agent conversation in its own Copilot thread, send an `X-Session-Id
 `user` field. Without either, the gateway fingerprints the first message of the conversation.
 
 ## Configuration
+
+Settings come from `.env` in the repo root (copied from `.env.example`). The table lists the defaults
+used when a variable is missing.
 
 | Variable | Default | Purpose |
 |---|---|---|

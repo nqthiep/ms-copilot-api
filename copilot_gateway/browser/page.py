@@ -5,9 +5,13 @@ from playwright.async_api import Page
 
 from copilot_gateway.browser.selectors import SELECTORS, Selectors
 from copilot_gateway.config import Settings
+from copilot_gateway.utils.logging import get_logger
 
+log = get_logger("page")
 NAVIGATION_TIMEOUT_MS = 30_000
 POLL_SECONDS = 0.5
+# How long to look for a sign-in control before assuming the page is already signed in.
+SIGN_IN_WAIT_SECONDS = 20
 
 # Renders a response element as plain text. Code blocks keep their ``` fences,
 # because coding agents such as Aider parse edits from fenced blocks.
@@ -50,7 +54,26 @@ class CopilotPage:
 
     async def open_home(self, timeout_ms: int) -> None:
         await self._page.goto(self._settings.copilot_url, wait_until="domcontentloaded")
+        await self._sign_in_if_offered(min(SIGN_IN_WAIT_SECONDS, timeout_ms / 1000))
         await self.wait_ready(timeout_ms)
+
+    async def _sign_in_if_offered(self, wait_seconds: float) -> None:
+        """Click the sign-in control if the page offers one. Stop as soon as the chat box shows."""
+        sign_in = self._page.get_by_role("link", name=self._sel.sign_in_text).or_(
+            self._page.get_by_role("button", name=self._sel.sign_in_text)
+        )
+        chat = self._page.locator(self._sel.chat_input)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + wait_seconds
+        while loop.time() < deadline:
+            # Checked first: a signed-out page can show the chat box as well.
+            if await sign_in.count() and await sign_in.first.is_visible():
+                log.info("Clicking %r; finish signing in in the browser window", self._sel.sign_in_text)
+                await sign_in.first.click()
+                return
+            if await chat.count() and await chat.first.is_visible():
+                return
+            await asyncio.sleep(POLL_SECONDS)
 
     async def wait_ready(self, timeout_ms: int) -> None:
         await self._page.locator(self._sel.chat_input).first.wait_for(

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from copilot_gateway.browser.page import CopilotPage
 from copilot_gateway.browser.session import BrowserSession
 from copilot_gateway.provider.copilot_provider import CopilotProvider
 from copilot_gateway.provider.errors import ProviderUnavailable
@@ -124,6 +125,22 @@ def test_long_prompt_is_moved_into_an_attached_file(mock_base_url, settings_fact
     reply = asyncio.run(scenario())
 
     assert "attachments: conversation.txt" in reply
+
+
+def test_sign_in_link_is_clicked_when_the_page_offers_it(mock_base_url, settings_factory):
+    settings = settings_factory(f"{mock_base_url}/signed_out.html", login_timeout=10)
+
+    async def scenario():
+        browser = BrowserSession(settings)
+        await browser.start()
+        try:
+            page = await browser.page()
+            await CopilotPage(page, settings).open_home(timeout_ms=10_000)
+            return page.url
+        finally:
+            await browser.close()
+
+    assert asyncio.run(scenario()).endswith("/mock_copilot.html")
 
 
 def test_window_moves_off_screen_and_the_page_keeps_working(settings_factory):

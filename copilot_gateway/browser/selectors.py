@@ -17,6 +17,8 @@ class Selectors:
     new_thread_button: str = '[aria-label*="New chat" i]'  # confirmed: <a href="/chat" aria-label="New chat">, not a button
     attach_button: str = 'button[data-testid="PlusMenuButton"]'  # confirmed: DevTools dump
     file_input: str = 'input[type="file"]'
+    # Accessible name of the control shown when signed out. Matched by role and name, not CSS.
+    sign_in_text: str = "Sign in"
 
 
 SELECTORS = Selectors()

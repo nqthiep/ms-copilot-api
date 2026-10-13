@@ -126,6 +126,27 @@ def test_long_prompt_is_moved_into_an_attached_file(mock_base_url, settings_fact
     assert "attachments: conversation.txt" in reply
 
 
+def test_window_moves_off_screen_and_the_page_keeps_working(settings_factory):
+    settings = settings_factory()
+
+    async def scenario():
+        browser = BrowserSession(settings)
+        await browser.start()
+        try:
+            bounds = await browser.move_offscreen()
+            page = await browser.page()
+            await page.set_content('<textarea aria-label="Message Copilot"></textarea>')
+            await page.fill("textarea", "still works")
+            return bounds, await page.input_value("textarea")
+        finally:
+            await browser.close()
+
+    bounds, typed = asyncio.run(scenario())
+
+    assert bounds["left"] == -32000
+    assert typed == "still works"
+
+
 def test_browser_replaces_a_closed_tab(settings_factory):
     settings = settings_factory()
 

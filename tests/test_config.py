@@ -32,6 +32,12 @@ def test_values_are_read_from_the_env_file(monkeypatch, tmp_path):
     assert settings.headless is True
 
 
+def test_hide_when_ready_is_off_by_default(monkeypatch, tmp_path):
+    monkeypatch.delenv("HIDE_WHEN_READY", raising=False)
+
+    assert load_settings(tmp_path / "none.env").hide_when_ready is False
+
+
 def test_real_environment_overrides_the_env_file(monkeypatch, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("GATEWAY_PORT=9001\n", encoding="utf-8")

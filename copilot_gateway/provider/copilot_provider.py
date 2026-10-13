@@ -181,6 +181,16 @@ class CopilotProvider(ChatProvider):
             ) from exc
         self._home_ready = True
         log.info("Copilot page ready")
+        if self._settings.hide_when_ready and not self._settings.headless:
+            await self._hide_window()
+
+    async def _hide_window(self) -> None:
+        # Cosmetic only, so a failure must not fail the request.
+        try:
+            bounds = await self._browser.move_offscreen()
+            log.info("Browser window moved off-screen (left=%s). It reappears if sign-in is needed.", bounds.get("left"))
+        except Exception:
+            log.warning("Could not move the browser window off-screen", exc_info=True)
 
     async def _recover(self) -> None:
         await self._browser.recover()

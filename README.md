@@ -44,6 +44,10 @@ python -m copilot_gateway
 The gateway opens Copilot in a visible browser window using the profile in `playwright-profile/` at
 the repo root. Sign in there (SSO and MFA happen in that window).
 
+With `HIDE_WHEN_READY=true`, the window moves off-screen after Copilot is ready, once you have signed
+in to Copilot and to the proxy. Its rendering keeps running, so requests still work. If the gateway
+later needs you to sign in again, it restarts the browser, and the window comes back on its own.
+
 Cookies that have an expiry survive restarts. Session-only cookies are dropped when the browser
 closes. So when Microsoft asks **Stay signed in?**, choose **Yes**. Do the same for any proxy sign-in
 that offers it. Stop the gateway with Ctrl+C, not by closing the window, so the browser shuts down
@@ -112,6 +116,7 @@ used when a variable is missing.
 | `COPILOT_URL` | `https://copilot.cloud.microsoft/` | Copilot page to drive |
 | `PLAYWRIGHT_PROFILE_DIR` | `playwright-profile/` in the repo root | Persistent browser profile (cookies, sign-in) |
 | `HEADLESS` | `false` | Keep `false` for the first sign-in |
+| `HIDE_WHEN_READY` | `false` | With `HEADLESS=false`, move the window off-screen once Copilot is ready. It reappears if sign-in is needed again |
 | `CHROMIUM_PATH` | unset | Use an existing Chromium binary |
 | `REQUEST_TIMEOUT` | `300` | Seconds for one request, retries included |
 | `MAX_RETRY` | `3` | Retries after the first attempt, each on a fresh thread |

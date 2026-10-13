@@ -9,6 +9,8 @@ from copilot_gateway.config import Settings
 from copilot_gateway.utils.logging import get_logger
 
 log = get_logger("browser")
+# Far outside any monitor. The page keeps rendering, unlike a minimized window.
+OFFSCREEN_POSITION = -32000
 
 
 class BrowserSession:
@@ -33,6 +35,24 @@ class BrowserSession:
             log.info("Opening a new browser tab")
             self._page = await self._context.new_page()
         return self._page
+
+    async def move_offscreen(self) -> dict:
+        """Move the window off the screen and return the bounds Chromium reports."""
+        page = await self.page()
+        cdp = await self._context.new_cdp_session(page)
+        try:
+            window = await cdp.send("Browser.getWindowForTarget")
+            await cdp.send(
+                "Browser.setWindowBounds",
+                {
+                    "windowId": window["windowId"],
+                    "bounds": {"windowState": "normal", "left": OFFSCREEN_POSITION, "top": OFFSCREEN_POSITION},
+                },
+            )
+            reported = await cdp.send("Browser.getWindowBounds", {"windowId": window["windowId"]})
+            return reported["bounds"]
+        finally:
+            await cdp.detach()
 
     async def recover(self) -> None:
         """Drop the current tab and context, then relaunch on the same profile."""

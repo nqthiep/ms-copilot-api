@@ -116,6 +116,8 @@ used when a variable is missing.
 | `COPILOT_URL` | `https://copilot.cloud.microsoft/` | Copilot page to drive |
 | `PLAYWRIGHT_PROFILE_DIR` | `playwright-profile/` in the repo root | Persistent browser profile (cookies, sign-in) |
 | `HEADLESS` | `false` | Keep `false` for the first sign-in |
+| `PROXY_SERVER` | unset | Corporate proxy, for example `http://proxy.example.com:8080`. Unset means no proxy |
+| `PROXY_USERNAME` / `PROXY_PASSWORD` | unset | Proxy login. Passing them lets the browser pass the proxy without a popup |
 | `HIDE_WHEN_READY` | `false` | With `HEADLESS=false`, move the window off-screen once Copilot is ready. It reappears if sign-in is needed again |
 | `CHROMIUM_PATH` | unset | Use an existing Chromium binary |
 | `REQUEST_TIMEOUT` | `300` | Seconds for one request, retries included |

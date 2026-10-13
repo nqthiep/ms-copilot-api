@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,6 +26,10 @@ class Settings:
     max_inline_chars: int
     max_file_bytes: int
     hide_when_ready: bool = False
+    proxy_server: str | None = None
+    proxy_username: str | None = None
+    # Kept out of repr so the password never shows up in logs or tracebacks.
+    proxy_password: str | None = field(default=None, repr=False)
 
 
 def load_settings(env_file: Path = ENV_FILE) -> Settings:
@@ -48,6 +52,9 @@ def load_settings(env_file: Path = ENV_FILE) -> Settings:
         debug_dir=Path(os.getenv("DEBUG_DIR", PACKAGE_DIR / "storage" / "debug")).resolve(),
         headless=os.getenv("HEADLESS", "false").lower() == "true",
         hide_when_ready=os.getenv("HIDE_WHEN_READY", "false").lower() == "true",
+        proxy_server=os.getenv("PROXY_SERVER") or None,
+        proxy_username=os.getenv("PROXY_USERNAME") or None,
+        proxy_password=os.getenv("PROXY_PASSWORD") or None,
         chromium_path=os.getenv("CHROMIUM_PATH") or None,
         request_timeout=float(os.getenv("REQUEST_TIMEOUT", "300")),
         max_retry=int(os.getenv("MAX_RETRY", "3")),

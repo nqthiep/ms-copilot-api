@@ -72,8 +72,20 @@ class BrowserSession:
             user_data_dir=str(self._settings.profile_dir),
             headless=self._settings.headless,
             executable_path=self._settings.chromium_path,
+            proxy=self._proxy(),
         )
         self._page = None
+
+    def _proxy(self) -> dict | None:
+        # Passing credentials here lets Playwright answer the proxy challenge itself,
+        # so no login popup appears on each browser launch.
+        if not self._settings.proxy_server:
+            return None
+        proxy: dict[str, str] = {"server": self._settings.proxy_server}
+        if self._settings.proxy_username:
+            proxy["username"] = self._settings.proxy_username
+            proxy["password"] = self._settings.proxy_password or ""
+        return proxy
 
     async def _close_context(self) -> None:
         if self._context is not None:

@@ -32,6 +32,10 @@ RENDER_JS = r"""
 """
 
 
+class NewChatNotFound(Exception):
+    """The page has no New chat control, so a new thread cannot be opened."""
+
+
 class CopilotPage:
     """Operations on one Copilot tab. Each method maps to a step in the request flow."""
 
@@ -55,11 +59,10 @@ class CopilotPage:
 
     async def create_thread(self) -> None:
         button = self._page.locator(self._sel.new_thread_button)
-        if await button.count():
-            await button.first.click()
-        else:
-            # Already on a fresh chat, so there is no "New chat" button to press.
-            await self._page.goto(self._settings.copilot_url, wait_until="domcontentloaded")
+        if await button.count() == 0:
+            # The home URL can reopen the last conversation, so fail instead of reusing it.
+            raise NewChatNotFound("New chat control not found; check selectors.py")
+        await button.first.click()
         await self.wait_ready(NAVIGATION_TIMEOUT_MS)
 
     async def open_thread(self, thread_url: str) -> None:

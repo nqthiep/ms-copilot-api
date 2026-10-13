@@ -144,9 +144,10 @@ class CopilotProvider(ChatProvider):
                 turn_text = OVERFLOW_PROMPT
 
             log.info(
-                "session=%s mode=%s prompt_chars=%d attachments=%d",
+                "session=%s mode=%s url=%s prompt_chars=%d attachments=%d",
                 session_key,
                 mode,
+                copilot.url,
                 len(turn_text),
                 len(paths),
             )

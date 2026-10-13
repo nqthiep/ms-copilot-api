@@ -14,7 +14,7 @@ class Selectors:
     send_button: str = 'button[aria-label*="Send" i]'  # confirmed: DevTools dump
     stop_button: str = 'button[aria-label*="Stop" i]'  # unverified
     response_item: str = '[data-testid="copilot-message-reply-div"]'  # candidate, not yet confirmed
-    new_thread_button: str = 'button[aria-label*="New" i]'  # not found on the live page; falls back to home URL
+    new_thread_button: str = '[aria-label*="New chat" i]'  # confirmed: <a href="/chat" aria-label="New chat">, not a button
     attach_button: str = 'button[data-testid="PlusMenuButton"]'  # confirmed: DevTools dump
     file_input: str = 'input[type="file"]'
 

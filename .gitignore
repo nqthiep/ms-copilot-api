@@ -8,5 +8,7 @@ __pycache__/
 
 # Runtime state: browser profile (cookies), thread mapping, debug screenshots
 playwright-profile/
+m365-profile/
 copilot_gateway/storage/sessions.json
+copilot_gateway/storage/tokens.json
 copilot_gateway/storage/debug/

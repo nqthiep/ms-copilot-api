@@ -12,7 +12,19 @@ class Usage(BaseModel):
 
 class AssistantMessage(BaseModel):
     role: Literal["assistant"] = "assistant"
-    content: str
+    content: str | None = None
+    tool_calls: list["ToolCallOut"] | None = None
+
+
+class ToolCallFunctionOut(BaseModel):
+    name: str
+    arguments: str
+
+
+class ToolCallOut(BaseModel):
+    id: str
+    type: Literal["function"] = "function"
+    function: ToolCallFunctionOut
 
 
 class Choice(BaseModel):
@@ -30,9 +42,22 @@ class ChatCompletion(BaseModel):
     usage: Usage
 
 
+class ChunkFunction(BaseModel):
+    name: str | None = None
+    arguments: str | None = None
+
+
+class ChunkToolCall(BaseModel):
+    index: int = 0
+    id: str | None = None
+    type: Literal["function"] | None = None
+    function: ChunkFunction | None = None
+
+
 class ChunkDelta(BaseModel):
     role: Literal["assistant"] | None = None
     content: str | None = None
+    tool_calls: list[ChunkToolCall] | None = None
 
 
 class ChunkChoice(BaseModel):
@@ -47,6 +72,7 @@ class ChatCompletionChunk(BaseModel):
     created: int
     model: str
     choices: list[ChunkChoice]
+    usage: Usage | None = None
 
 
 class ModelInfo(BaseModel):

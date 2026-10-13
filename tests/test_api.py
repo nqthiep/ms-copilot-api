@@ -53,7 +53,28 @@ def test_health_reports_ok(client):
 def test_models_lists_copilot_web(client):
     response = client.get("/v1/models")
 
-    assert response.json()["data"][0]["id"] == "copilot-web"
+    ids = [m["id"] for m in response.json()["data"]]
+    assert "m365-copilot" in ids
+    assert "copilot-web" in ids  # legacy alias
+
+
+def test_models_alias_route(client):
+    response = client.get("/models")
+
+    assert response.status_code == 200
+    assert response.json()["object"] == "list"
+
+
+def test_get_single_model(client):
+    response = client.get("/v1/models/m365-copilot")
+
+    assert response.json()["id"] == "m365-copilot"
+
+
+def test_get_unknown_model_returns_400(client):
+    response = client.get("/v1/models/does-not-exist")
+
+    assert response.status_code == 400
 
 
 def test_chat_completion_has_openai_shape(client, provider):
@@ -81,15 +102,34 @@ def test_stream_returns_sse_chunks_and_done(client):
     assert lines[-1] == "data: [DONE]"
     first = json.loads(lines[0].removeprefix("data: "))
     assert first["object"] == "chat.completion.chunk"
-    assert first["choices"][0]["delta"]["content"] == "pong"
+    assert first["choices"][0]["delta"]["role"] == "assistant"
+    contents = [
+        json.loads(line.removeprefix("data: "))["choices"][0]["delta"].get("content")
+        for line in lines[:-1]
+    ]
+    assert "pong" in [c for c in contents if c]
 
 
-def test_image_parts_are_not_supported(client):
+def test_image_data_url_parts_reach_the_provider(client, provider):
+    encoded = base64.b64encode(b"\x89PNG\r\n\x1a\n").decode()
+
+    response = chat(client, messages=[{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded}"}},
+    ]}])
+
+    assert response.status_code == 200
+    (message,) = provider.calls[0][1]
+    assert message.images[0].mime == "image/png"
+    assert message.images[0].data == b"\x89PNG\r\n\x1a\n"
+
+
+def test_remote_image_url_is_rejected(client):
     response = chat(client, messages=[{"role": "user", "content": [
         {"type": "image_url", "image_url": {"url": "https://example.test/a.png"}},
     ]}])
 
-    assert response.status_code == 422
+    assert response.status_code == 400
+    assert "data: URL" in response.json()["error"]["message"]
 
 
 def test_disallowed_attachment_returns_400(client):
@@ -177,5 +217,7 @@ def test_stream_chunks_match_the_openai_sdk_schema(client):
 
     chunks = [OpenAIChatCompletionChunk.model_validate_json(payload) for payload in payloads]
 
-    assert chunks[0].choices[0].delta.content == "pong"
+    assert chunks[0].choices[0].delta.role == "assistant"
+    content_chunks = [c for c in chunks if c.choices[0].delta.content]
+    assert content_chunks[0].choices[0].delta.content == "pong"
     assert chunks[-1].choices[0].finish_reason == "stop"

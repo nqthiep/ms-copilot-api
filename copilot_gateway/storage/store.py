@@ -11,9 +11,15 @@ log = get_logger("store")
 @dataclass(frozen=True)
 class ThreadState:
     # Copilot thread URL, or None when Copilot has not assigned one yet.
-    thread_url: str | None
+    thread_url: str | None = None
     # How many user turns the thread has received so far.
-    user_turns: int
+    user_turns: int = 0
+    # Sydney (SignalR) conversation identifiers. None when the browser provider
+    # or an older gateway version wrote the entry.
+    sydney_session_id: str | None = None
+    sydney_conversation_id: str | None = None
+    # How many client turns (user + tool messages) the Sydney conversation holds.
+    sydney_turns: int = 0
 
 
 class SessionStore:

@@ -100,15 +100,20 @@ def test_stored_credentials_pass_the_proxy_without_a_prompt(settings_factory, au
 
 def test_proxy_challenge_fails_without_credentials(settings_factory, auth_proxy):
     # Without credentials the proxy's 407 challenge cannot be answered. A headed browser would
-    # show the login popup; a headless one fails the navigation instead.
+    # show the login popup; headless Chromium fails the navigation (headless-shell instead
+    # surfaces the 407 response).
     proxy_port, _ = auth_proxy
     settings = settings_factory(
         "http://mock.test/mock_copilot.html",
         proxy_server=f"http://127.0.0.1:{proxy_port}",
     )
 
-    with pytest.raises(PlaywrightError, match="ERR_INVALID_AUTH_CREDENTIALS"):
-        open_through_proxy(settings)
+    try:
+        status, _ = open_through_proxy(settings)
+    except PlaywrightError as exc:
+        assert "ERR_INVALID_AUTH_CREDENTIALS" in str(exc)
+    else:
+        assert status == 407
 
 
 def test_password_is_not_shown_in_settings_repr(settings_factory):

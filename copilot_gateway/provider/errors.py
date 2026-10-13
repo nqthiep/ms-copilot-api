@@ -20,3 +20,10 @@ class ProviderUnavailable(GatewayError):
 class ProviderTimeout(GatewayError):
     status_code = 504
     error_type = "timeout"
+
+
+class AuthRequired(GatewayError):
+    """No valid Microsoft credential; the user must sign in (again)."""
+
+    status_code = 401
+    error_type = "authentication_error"

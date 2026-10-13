@@ -7,6 +7,8 @@ from copilot_gateway.models.request import ChatMessage
 from copilot_gateway.provider.errors import BadRequest
 
 ALLOWED_EXTENSIONS = {".py", ".md", ".txt", ".docx", ".pdf", ".json", ".yaml", ".yml"}
+# Extensions whose content is inlined into the prompt as text.
+TEXT_EXTENSIONS = {".py", ".md", ".txt", ".json", ".yaml", ".yml"}
 ROLE_ALIASES = {"developer": "system"}
 
 
@@ -17,10 +19,28 @@ class AttachedFile:
 
 
 @dataclass(frozen=True)
+class AttachedImage:
+    filename: str
+    data: bytes
+    mime: str
+
+
+@dataclass(frozen=True)
+class NormalizedToolCall:
+    id: str
+    name: str
+    arguments: str  # raw JSON string, as the client sent it
+
+
+@dataclass(frozen=True)
 class NormalizedMessage:
-    role: str  # "system" | "user" | "assistant"
+    role: str  # "system" | "user" | "assistant" | "tool"
     text: str
     files: tuple[AttachedFile, ...] = ()
+    images: tuple[AttachedImage, ...] = ()
+    tool_calls: tuple[NormalizedToolCall, ...] = ()
+    tool_call_id: str | None = None
+    tool_name: str | None = None
 
 
 def normalize_messages(messages: list[ChatMessage], max_file_bytes: int) -> list[NormalizedMessage]:
@@ -29,20 +49,51 @@ def normalize_messages(messages: list[ChatMessage], max_file_bytes: int) -> list
 
 def _normalize(message: ChatMessage, max_file_bytes: int) -> NormalizedMessage:
     role = ROLE_ALIASES.get(message.role, message.role)
+    tool_calls = tuple(
+        NormalizedToolCall(
+            id=tc.id or "",
+            name=(tc.function.name if tc.function else None) or "",
+            arguments=(tc.function.arguments if tc.function else None) or "{}",
+        )
+        for tc in (message.tool_calls or [])
+    )
     content = message.content
     if content is None:
-        return NormalizedMessage(role=role, text="")
+        return NormalizedMessage(
+            role=role,
+            text="",
+            tool_calls=tool_calls,
+            tool_call_id=message.tool_call_id,
+            tool_name=message.name,
+        )
     if isinstance(content, str):
-        return NormalizedMessage(role=role, text=content)
+        return NormalizedMessage(
+            role=role,
+            text=content,
+            tool_calls=tool_calls,
+            tool_call_id=message.tool_call_id,
+            tool_name=message.name,
+        )
 
     texts: list[str] = []
     files: list[AttachedFile] = []
+    images: list[AttachedImage] = []
     for part in content:
         if part.type == "text":
             texts.append(part.text)
+        elif part.type == "image_url":
+            images.append(_decode_image(part.image_url.url, max_file_bytes))
         else:
             files.append(_decode_file(part.file.filename, part.file.file_data, max_file_bytes))
-    return NormalizedMessage(role=role, text="\n".join(texts), files=tuple(files))
+    return NormalizedMessage(
+        role=role,
+        text="\n".join(texts),
+        files=tuple(files),
+        images=tuple(images),
+        tool_calls=tool_calls,
+        tool_call_id=message.tool_call_id,
+        tool_name=message.name,
+    )
 
 
 def _decode_file(filename: str, file_data: str, max_file_bytes: int) -> AttachedFile:
@@ -58,6 +109,25 @@ def _decode_file(filename: str, file_data: str, max_file_bytes: int) -> Attached
     if len(data) > max_file_bytes:
         raise BadRequest(f"{name!r} exceeds the {max_file_bytes} byte limit")
     return AttachedFile(filename=name, data=data)
+
+
+def _decode_image(url: str, max_file_bytes: int) -> AttachedImage:
+    if not url.startswith("data:"):
+        raise BadRequest(
+            "Remote image URLs are not supported; send the image as a data: URL instead"
+        )
+    header, _, payload = url.partition(",")
+    mime = header[5:].split(";")[0] or "image/png"
+    if not mime.startswith("image/"):
+        raise BadRequest(f"Unsupported image MIME type {mime!r}")
+    try:
+        data = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise BadRequest("image_url data is not valid base64") from exc
+    if len(data) > max_file_bytes:
+        raise BadRequest(f"Image exceeds the {max_file_bytes} byte limit")
+    ext = mime.split("/", 1)[1].split("+")[0]
+    return AttachedImage(filename=f"image.{ext}", data=data, mime=mime)
 
 
 def compile_prompt(messages: list[NormalizedMessage]) -> str:
@@ -93,3 +163,14 @@ def pending_user_turns(messages: list[NormalizedMessage], sent: int) -> list[Nor
     users = [m for m in messages if m.role == "user"]
     count = max(len(users) - sent, 1)
     return users[-count:]
+
+
+def pending_client_turns(messages: list[NormalizedMessage], sent: int) -> list[NormalizedMessage]:
+    """The client turns (user + tool messages) the backend conversation has not seen yet.
+
+    Same contract as pending_user_turns, but tool results count as turns too, so an
+    agent loop that only appends tool results still makes progress.
+    """
+    turns = [m for m in messages if m.role in ("user", "tool")]
+    count = max(len(turns) - sent, 1)
+    return turns[-count:]

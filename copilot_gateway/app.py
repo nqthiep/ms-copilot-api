@@ -9,15 +9,24 @@ from copilot_gateway.config import Settings, load_settings
 from copilot_gateway.provider.base import ChatProvider
 from copilot_gateway.provider.copilot_provider import CopilotProvider
 from copilot_gateway.provider.errors import GatewayError
+from copilot_gateway.provider.sydney_provider import SydneyProvider
 from copilot_gateway.utils.logging import get_logger, setup_logging
 
 log = get_logger("app")
 
 
+def build_provider(settings: Settings) -> ChatProvider:
+    if settings.provider == "browser":
+        log.info("Using the Playwright browser provider")
+        return CopilotProvider(settings)
+    log.info("Using the Sydney (SignalR) provider")
+    return SydneyProvider(settings)
+
+
 def create_app(settings: Settings | None = None, provider: ChatProvider | None = None) -> FastAPI:
     settings = settings or load_settings()
     setup_logging()
-    provider = provider or CopilotProvider(settings)
+    provider = provider or build_provider(settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:

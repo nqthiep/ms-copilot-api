@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mock Copilot</title>
+  <style>
+    body { font-family: sans-serif; margin: 24px; }
+    .chip { display: inline-block; background: #eee; margin: 2px; padding: 2px 6px; border-radius: 4px; }
+    textarea { width: 100%; }
+  </style>
+</head>
+<body>
+  <!-- Stand-in for copilot.cloud.microsoft. It uses the same selectors as selectors.py,
+       which is what the browser tests exercise. It is not a copy of the real page. -->
+  <button aria-label="New chat" id="new">New chat</button>
+  <div id="log"></div>
+  <div id="composer">
+    <span id="chips"></span>
+    <button aria-label="Attach file" id="attach">+</button>
+    <textarea aria-label="Message Copilot" id="input" rows="3"></textarea>
+    <button aria-label="Send message" id="send">Send</button>
+  </div>
+  <script>
+    const STORE = "mockThreads";
+    const $ = (id) => document.getElementById(id);
+    let pendingFiles = [];
+
+    const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const threads = () => JSON.parse(localStorage.getItem(STORE) || "{}");
+    const saveThreads = (t) => localStorage.setItem(STORE, JSON.stringify(t));
+    const currentId = () => (location.hash.match(/#\/chat\/(\w+)/) || [])[1] || null;
+
+    function render() {
+      const id = currentId();
+      $("log").innerHTML = "";
+      if (!id) return;
+      for (const m of threads()[id] || []) {
+        const div = document.createElement("div");
+        div.setAttribute("data-content", m.role === "user" ? "user-message" : "ai-message");
+        div.innerHTML = m.html;
+        $("log").appendChild(div);
+      }
+    }
+
+    function renderChips() {
+      $("chips").innerHTML = pendingFiles.map((n) => `<span class="chip">${escapeHtml(n)}</span>`).join("");
+    }
+
+    $("new").addEventListener("click", () => {
+      location.hash = "#/chat/" + Math.random().toString(36).slice(2, 10);
+    });
+
+    $("attach").addEventListener("click", () => {
+      if (document.querySelector('input[type="file"]')) return;
+      const input = document.createElement("input");
+      input.type = "file";
+      input.multiple = true;
+      input.style.display = "none";
+      input.addEventListener("change", () => {
+        pendingFiles = [...input.files].map((f) => f.name);
+        renderChips();
+      });
+      document.body.appendChild(input);
+    });
+
+    $("send").addEventListener("click", async () => {
+      const text = $("input").value;
+      if (!text.trim()) return;
+      if (!currentId()) location.hash = "#/chat/" + Math.random().toString(36).slice(2, 10);
+      const id = currentId();
+
+      const files = pendingFiles;
+      pendingFiles = [];
+      renderChips();
+
+      const t = threads();
+      t[id] = t[id] || [];
+      t[id].push({ role: "user", html: escapeHtml(text) });
+      saveThreads(t);
+      render();
+      $("input").value = "";
+
+      // The reply reports which turn of this thread it is, so a test can tell whether
+      // the thread was reused. It also reports the attachment names it received.
+      const userTurns = t[id].filter((m) => m.role === "user").length;
+      const names = files.length ? files.join(", ") : "none";
+      const full = `turn ${userTurns}: ACK; attachments: ${names}`;
+
+      const stop = document.createElement("button");
+      stop.setAttribute("aria-label", "Stop generating");
+      stop.textContent = "Stop";
+      $("composer").appendChild(stop);
+
+      const wrap = document.createElement("div");
+      wrap.setAttribute("data-content", "ai-message");
+      const p = document.createElement("p");
+      wrap.appendChild(p);
+      $("log").appendChild(wrap);
+
+      const step = Math.ceil(full.length / 3);
+      for (let i = 1; i <= 3; i++) {
+        await new Promise((r) => setTimeout(r, 150));
+        p.textContent = full.slice(0, i * step);
+      }
+      p.textContent = full;
+      if (text.includes("CODE")) {
+        wrap.insertAdjacentHTML("beforeend", '<pre><code class="language-python">print(1)\n</code></pre>');
+      }
+      stop.remove();
+
+      const saved = threads();
+      saved[id].push({ role: "assistant", html: wrap.innerHTML });
+      saveThreads(saved);
+    });
+
+    window.addEventListener("hashchange", render);
+    render();
+  </script>
+</body>
+</html>

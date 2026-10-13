@@ -46,8 +46,10 @@
       $("chips").innerHTML = pendingFiles.map((n) => `<span class="chip">${escapeHtml(n)}</span>`).join("");
     }
 
+    // New chat only clears the URL. The thread id appears on the first send, as in the real page.
     $("new").addEventListener("click", () => {
-      location.hash = "#/chat/" + Math.random().toString(36).slice(2, 10);
+      location.hash = "";
+      render();
     });
 
     $("attach").addEventListener("click", () => {
@@ -63,9 +65,12 @@
       document.body.appendChild(input);
     });
 
+    let busy = false;  // hashchange must not re-render the reply that is streaming
+
     $("send").addEventListener("click", async () => {
       const text = $("input").value;
       if (!text.trim()) return;
+      busy = true;
       if (!currentId()) location.hash = "#/chat/" + Math.random().toString(36).slice(2, 10);
       const id = currentId();
 
@@ -111,9 +116,10 @@
       const saved = threads();
       saved[id].push({ role: "assistant", html: wrap.innerHTML });
       saveThreads(saved);
+      busy = false;
     });
 
-    window.addEventListener("hashchange", render);
+    window.addEventListener("hashchange", () => { if (!busy) render(); });
     render();
   </script>
 </body>

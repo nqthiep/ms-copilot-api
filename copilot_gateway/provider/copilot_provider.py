@@ -153,6 +153,7 @@ class CopilotProvider(ChatProvider):
             )
             if paths:
                 await copilot.attach_files(paths)
+            url_before_send = copilot.url
             baseline = await copilot.send_message(turn_text)
             reply = await copilot.read_response(baseline)
 
@@ -163,7 +164,7 @@ class CopilotProvider(ChatProvider):
         self._store.put(
             session_key,
             ThreadState(
-                thread_url=self._thread_url(copilot.url),
+                thread_url=_thread_url_after_turn(mode, state, url_before_send, copilot.url),
                 message_count=len(stored),
                 prefix_hash=prefix_hash(stored),
             ),
@@ -189,11 +190,6 @@ class CopilotProvider(ChatProvider):
         self._home_ready = False
         self._dirty = False
 
-    def _thread_url(self, url: str) -> str | None:
-        """Only a real thread URL is worth storing. The home page is not a thread."""
-        home = self._settings.copilot_url.rstrip("/")
-        return None if url.rstrip("/") == home else url
-
     async def _capture_debug(self, label: str) -> None:
         """Save a screenshot so a broken selector can be diagnosed. Best effort."""
         try:
@@ -208,6 +204,19 @@ class CopilotProvider(ChatProvider):
 
 def _files_of(messages: list[NormalizedMessage]) -> list[AttachedFile]:
     return [f for m in messages for f in m.files]
+
+
+def _thread_url_after_turn(
+    mode: str, state: ThreadState | None, url_before: str, url_after: str
+) -> str | None:
+    """A continued thread keeps its URL. A new chat has one only if its URL changed during the turn.
+
+    Copilot's URL before the first message may not name the thread, so a URL that
+    never changes is not stored. The next turn then sends the full prompt, which is slower but correct.
+    """
+    if mode == "continue" and state is not None:
+        return state.thread_url
+    return url_after if url_after != url_before else None
 
 
 def _write_files(root: Path, files: list[AttachedFile]) -> list[Path]:

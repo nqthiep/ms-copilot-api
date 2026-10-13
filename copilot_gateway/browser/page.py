@@ -77,8 +77,14 @@ class CopilotPage:
     async def send_message(self, text: str) -> int:
         """Type and submit a message. Returns how many response items existed before sending."""
         baseline = await self._page.locator(self._sel.response_item).count()
-        await self._page.locator(self._sel.chat_input).first.fill(text)
-        await self._page.locator(self._sel.send_button).first.click()
+        box = self._page.locator(self._sel.chat_input).first
+        await box.fill(text)
+        send = self._page.locator(self._sel.send_button)
+        if await send.count():
+            await send.first.click()
+        else:
+            # The send button may only render once the box has text. Enter submits in Copilot.
+            await box.press("Enter")
         return baseline
 
     async def read_response(self, baseline: int) -> str:

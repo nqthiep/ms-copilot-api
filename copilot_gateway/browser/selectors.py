@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Selectors:
-    chat_input: str = 'textarea[aria-label*="Message" i], div[role="textbox"][contenteditable="true"]'
+    chat_input: str = 'textarea[aria-label*="Message" i], [role="textbox"][aria-label*="Message" i]'
     send_button: str = 'button[aria-label*="Send" i]'
     stop_button: str = 'button[aria-label*="Stop" i]'
     response_item: str = '[data-content="ai-message"]'

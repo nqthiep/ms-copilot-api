@@ -1,3 +1,4 @@
+import base64
 import json
 
 import pytest
@@ -135,6 +136,21 @@ def test_auto_session_key_is_stable_across_turns(client, provider):
     assert first_key == second_key
     assert first_key.startswith("auto:")
     assert other_key != first_key
+
+
+def test_file_part_reaches_the_provider(client, provider):
+    encoded = base64.b64encode(b"print('hi')\n").decode()
+
+    response = chat(client, messages=[{"role": "user", "content": [
+        {"type": "text", "text": "summarize"},
+        {"type": "file", "file": {"filename": "main.py", "file_data": f"data:text/x-python;base64,{encoded}"}},
+    ]}])
+
+    assert response.status_code == 200
+    (message,) = provider.calls[0][1]
+    assert message.text == "summarize"
+    assert message.files[0].filename == "main.py"
+    assert message.files[0].data == b"print('hi')\n"
 
 
 def test_response_matches_the_openai_sdk_schema(client):

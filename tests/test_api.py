@@ -2,6 +2,8 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from openai.types.chat import ChatCompletion as OpenAIChatCompletion
+from openai.types.chat import ChatCompletionChunk as OpenAIChatCompletionChunk
 
 from copilot_gateway.app import create_app
 from copilot_gateway.provider.base import ChatProvider
@@ -133,3 +135,31 @@ def test_auto_session_key_is_stable_across_turns(client, provider):
     assert first_key == second_key
     assert first_key.startswith("auto:")
     assert other_key != first_key
+
+
+def test_response_matches_the_openai_sdk_schema(client):
+    body = chat(client).json()
+
+    parsed = OpenAIChatCompletion.model_validate(body)
+
+    assert parsed.object == "chat.completion"
+    assert parsed.choices[0].message.role == "assistant"
+    assert parsed.choices[0].message.content == "pong"
+
+
+def test_stream_chunks_match_the_openai_sdk_schema(client):
+    with client.stream("POST", "/v1/chat/completions", json={
+        "model": "copilot-web",
+        "messages": [{"role": "user", "content": "hello"}],
+        "stream": True,
+    }) as response:
+        payloads = [
+            line.removeprefix("data: ")
+            for line in response.iter_lines()
+            if line.startswith("data: ") and line != "data: [DONE]"
+        ]
+
+    chunks = [OpenAIChatCompletionChunk.model_validate_json(payload) for payload in payloads]
+
+    assert chunks[0].choices[0].delta.content == "pong"
+    assert chunks[-1].choices[0].finish_reason == "stop"

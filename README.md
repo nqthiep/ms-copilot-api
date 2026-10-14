@@ -28,6 +28,7 @@ Requires Python 3.11+.
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
+playwright install chromium   # one-time: the Microsoft sign-in opens a real browser window
 ```
 
 Create your local settings file from the template. `.env` is git-ignored, so it stays on your machine:

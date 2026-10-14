@@ -25,6 +25,15 @@ It is for local use on `127.0.0.1` only.
 
 Requires Python 3.11+.
 
+The easy way — one script does everything (venv, dependencies, Playwright
+Chromium, `.env`) and then starts the gateway:
+
+```bash
+./setup.sh
+```
+
+Or step by step:
+
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"

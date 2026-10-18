@@ -1,0 +1,2 @@
+# setup.sh must keep LF endings: with CRLF, bash on Windows (Git Bash, WSL) fails.
+*.sh text eol=lf

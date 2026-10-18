@@ -25,12 +25,24 @@ It is for local use on `127.0.0.1` only.
 
 Requires Python 3.11+.
 
-The easy way — one script does everything (venv, dependencies, Playwright
-Chromium, `.env`) and then starts the gateway:
+One command does everything (virtualenv, dependencies, Playwright Chromium, `.env`) and then starts
+the gateway:
 
-```bash
-./setup.sh
-```
+- **macOS, Linux, WSL, or Git Bash on Windows:**
+
+  ```bash
+  bash setup.sh
+  ```
+
+- **Windows PowerShell:**
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\setup.ps1
+  ```
+
+Add `--no-start` (`-NoStart` in PowerShell) to set up without starting, or `--no-browser`
+(`-NoBrowser`) to skip Chromium. Sign-in needs Chromium, so skip it only when `CHROMIUM_PATH` in `.env`
+points to a browser you already have.
 
 Or step by step:
 

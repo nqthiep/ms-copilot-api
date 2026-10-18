@@ -1,56 +1,136 @@
 #!/usr/bin/env bash
-# Full setup + start for the Copilot Gateway (macOS / Linux).
+# One-command setup and start for the Copilot Gateway.
+# Works on macOS, Linux, WSL and Git Bash on Windows. Windows PowerShell users
+# run setup.ps1 instead.
 #
-# What it does, in order:
-#   1. Creates a virtualenv in .venv (skipped if it already exists)
-#   2. Installs the gateway and its dependencies into the venv
-#   3. Installs the Playwright Chromium browser (the one-time Microsoft
-#      sign-in opens a real browser window, so this is required)
-#   4. Creates .env from .env.example (skipped if .env already exists)
-#   5. Starts the gateway in the foreground
+#   bash setup.sh                 set up, then start the gateway in the foreground
+#   bash setup.sh --no-start      set up only
+#   bash setup.sh --no-browser    skip installing Playwright Chromium
 #
-# Re-running is safe: existing .venv and .env are left untouched.
-set -euo pipefail
+# Re-running is safe: a working .venv is reused and an existing .env is left alone.
+# Uses only bash features that bash 3.2 (the macOS default) supports.
+set -eu
 
 cd "$(dirname "$0")"
 
-PYTHON="${PYTHON:-python3}"
+START=1
+BROWSER=1
+for arg in "$@"; do
+  case "$arg" in
+    --no-start) START=0 ;;
+    --no-browser) BROWSER=0 ;;
+    -h|--help)
+      sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown option: $arg" >&2
+      exit 2
+      ;;
+  esac
+done
 
-# --- Python 3.11+ required ---------------------------------------------------
-if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
-  echo "ERROR: Python 3.11 or newer is required (found: $("$PYTHON" --version 2>&1))." >&2
-  exit 1
+say()  { printf '==> %s\n' "$*"; }
+warn() { printf 'WARNING: %s\n' "$*" >&2; }
+die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+# --- Platform (used only for messages) ----------------------------------------
+case "$(uname -s)" in
+  Darwin) PLATFORM="macOS" ;;
+  Linux)
+    if grep -qi microsoft /proc/version 2>/dev/null; then PLATFORM="WSL"; else PLATFORM="Linux"; fi
+    ;;
+  MINGW*|MSYS*|CYGWIN*) PLATFORM="Git Bash" ;;
+  *) PLATFORM="unknown" ;;
+esac
+say "Platform: $PLATFORM"
+
+# --- Python 3.11+ -------------------------------------------------------------
+# PY holds the command that works, for example (python3) or (py -3).
+PY=()
+try_python() {
+  if command -v "$1" >/dev/null 2>&1 && \
+     "$@" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    PY=("$@")
+    return 0
+  fi
+  return 1
+}
+
+if [ -n "${PYTHON:-}" ]; then
+  # PYTHON is an explicit choice, so there is no fallback. It may hold a command plus arguments.
+  # shellcheck disable=SC2086
+  try_python $PYTHON || die "PYTHON=$PYTHON is not Python 3.11 or newer."
+else
+  try_python python3 || try_python python || try_python py -3 || {
+    case "$PLATFORM" in
+      macOS) hint="brew install python@3.12" ;;
+      WSL|Linux) hint="sudo apt install python3 python3-venv   (or your distro's equivalent)" ;;
+      "Git Bash") hint="winget install Python.Python.3.12, then open a new Git Bash window" ;;
+      *) hint="install Python 3.11 or newer from https://www.python.org/downloads/" ;;
+    esac
+    die "Python 3.11 or newer was not found. Install it with: $hint"
+  }
 fi
+say "Using Python: $("${PY[@]}" -c 'import sys; print(sys.version.split()[0])')"
 
 # --- Virtualenv ---------------------------------------------------------------
-if [ ! -d ".venv" ]; then
-  echo "==> Creating virtualenv in .venv ..."
-  "$PYTHON" -m venv .venv
+# macOS, Linux and WSL put the interpreter in bin/. Windows (Git Bash) uses Scripts/.
+VENV_PY=""
+find_venv_python() {
+  for candidate in .venv/bin/python .venv/Scripts/python.exe; do
+    if [ -x "$candidate" ] && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+      VENV_PY="$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if find_venv_python; then
+  say "Using existing .venv"
 else
-  echo "==> Using existing .venv"
+  if [ -e .venv ]; then
+    say "Existing .venv does not work on this system (created on another OS?). Recreating it."
+    rm -rf .venv
+  fi
+  say "Creating virtualenv in .venv"
+  "${PY[@]}" -m venv .venv \
+    || die "Could not create .venv. On Debian or Ubuntu, install it with: sudo apt install python3-venv"
+  find_venv_python || die "The new .venv has no working Python. Delete .venv and run setup again."
 fi
 
-VENV_PY=".venv/bin/python"
-VENV_PW=".venv/bin/playwright"
-
 # --- Dependencies -------------------------------------------------------------
-echo "==> Installing the gateway and dependencies ..."
-"$VENV_PY" -m pip install --upgrade pip -q
-"$VENV_PY" -m pip install -e ".[dev]"
+say "Installing the gateway and its dependencies"
+"$VENV_PY" -m pip install --quiet --upgrade pip
+"$VENV_PY" -m pip install --quiet -e ".[dev]"
 
-# --- Playwright browser -------------------------------------------------------
-echo "==> Installing Playwright Chromium ..."
-"$VENV_PW" install chromium
+# --- Playwright Chromium ------------------------------------------------------
+# Microsoft sign-in opens a real browser window, so Chromium is needed.
+if [ "$BROWSER" = 1 ]; then
+  say "Installing Playwright Chromium"
+  if ! "$VENV_PY" -m playwright install chromium; then
+    warn "Playwright could not install Chromium, and sign-in needs it."
+    warn "Retry: $VENV_PY -m playwright install chromium"
+    warn "On Linux you may also need: $VENV_PY -m playwright install-deps chromium (needs sudo)"
+    warn "Or set CHROMIUM_PATH in .env to an existing Chrome or Chromium."
+  fi
+else
+  say "Skipping Playwright Chromium (--no-browser)"
+fi
 
 # --- Local settings -----------------------------------------------------------
-if [ ! -f ".env" ]; then
-  echo "==> Creating .env from .env.example ..."
-  cp .env.example .env
-  echo "    Edit .env if you need to change host/port."
+if [ -f .env ]; then
+  say ".env already exists, leaving it alone"
 else
-  echo "==> .env already exists, leaving it alone"
+  [ -f .env.example ] || die ".env.example is missing from this checkout"
+  cp .env.example .env
+  say "Created .env from .env.example"
 fi
 
 # --- Start --------------------------------------------------------------------
-echo "==> Starting the gateway ..."
-exec "$VENV_PY" -m copilot_gateway
+if [ "$START" = 1 ]; then
+  say "Starting the gateway (Ctrl+C to stop)"
+  exec "$VENV_PY" -m copilot_gateway
+fi
+say "Setup complete. Start the gateway with: $VENV_PY -m copilot_gateway"

@@ -197,3 +197,56 @@ def test_complete_joins_deltas(provider, monkeypatch):
         return await provider.complete("s1", [NormalizedMessage(role="user", text="hi")])
 
     assert asyncio.run(scenario()) == "abc"
+
+
+def test_new_chat_with_fewer_turns_opens_a_new_conversation(provider, monkeypatch):
+    calls = stub_stream(monkeypatch, [["one"], ["fresh"]])
+    old_chat = [
+        NormalizedMessage(role="user", text="q1"),
+        NormalizedMessage(role="assistant", text="a1"),
+        NormalizedMessage(role="user", text="q2"),
+        NormalizedMessage(role="assistant", text="a2"),
+        NormalizedMessage(role="user", text="q3"),
+    ]
+    run_events(provider, "auto:x", old_chat)
+
+    run_events(provider, "auto:x", [NormalizedMessage(role="user", text="fresh start")])
+
+    assert calls[1]["conversation"].conversation_id != calls[0]["conversation"].conversation_id
+    assert calls[1]["conversation"].is_first_turn is True
+
+
+def test_new_chat_with_the_same_first_message_opens_a_new_conversation(provider, monkeypatch):
+    # Same request bytes as the first chat's opening message, and no echoed reply.
+    calls = stub_stream(monkeypatch, [["one"], ["two"]])
+    opening = [NormalizedMessage(role="user", text="same start")]
+    run_events(provider, "auto:y", opening)
+
+    run_events(provider, "auto:y", opening)
+
+    assert calls[1]["conversation"].conversation_id != calls[0]["conversation"].conversation_id
+
+
+def test_explicit_session_keeps_one_conversation_when_only_the_newest_message_is_sent(provider, monkeypatch):
+    calls = stub_stream(monkeypatch, [["one"], ["two"]])
+    run_events(provider, "explicit:agent-1", [NormalizedMessage(role="user", text="hello")])
+
+    run_events(provider, "explicit:agent-1", [NormalizedMessage(role="user", text="again")])
+
+    assert calls[1]["conversation"].conversation_id == calls[0]["conversation"].conversation_id
+    assert calls[1]["conversation"].is_first_turn is False
+    assert "again" in calls[1]["text"]
+
+
+def test_continuing_auto_chat_keeps_its_conversation(provider, monkeypatch):
+    calls = stub_stream(monkeypatch, [["one"], ["two"]])
+    first = [NormalizedMessage(role="user", text="question")]
+    run_events(provider, "auto:z", first)
+
+    run_events(
+        provider,
+        "auto:z",
+        first + [NormalizedMessage(role="assistant", text="one"), NormalizedMessage(role="user", text="follow up")],
+    )
+
+    assert calls[1]["conversation"].conversation_id == calls[0]["conversation"].conversation_id

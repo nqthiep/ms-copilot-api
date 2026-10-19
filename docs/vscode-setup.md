@@ -105,9 +105,21 @@ Two caveats:
 ## 5. Sessions
 
 Each VSCode chat session maps to one server-side Copilot conversation, so
-follow-up questions keep context. The mapping is by conversation content unless
-the client sends `X-Session-Id`; starting a **New Chat** in VSCode starts a new
-Copilot conversation automatically.
+follow-up questions keep context.
+
+The gateway decides which chat a request belongs to like this:
+
+- **Different first message:** a new chat gets its own key, so it gets a new
+  Copilot conversation.
+- **Same first message as an earlier chat:** the gateway starts a new
+  conversation when the request has fewer turns than the stored conversation,
+  or when it does not repeat the assistant's earlier reply. A chat that continues
+  a conversation always repeats that reply, so this does not split it.
+- **`X-Session-Id` header:** if the client sends one, the gateway trusts it, and
+  a client that sends only its newest message keeps one conversation.
+
+Limit: if you switch back and forth between two chats that start with the same
+message, their turns can mix. Give them different first messages to avoid this.
 
 ## Troubleshooting
 

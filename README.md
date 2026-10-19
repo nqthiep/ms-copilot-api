@@ -173,7 +173,9 @@ used when a variable is missing.
 - **One session, one conversation.** The session key (the `X-Session-Id` header, the `user`
   field, or a fingerprint of the first message) maps to one server-side conversation in
   `copilot_gateway/storage/sessions.json`. Each request sends only the user/tool turns the
-  conversation has not seen yet.
+  conversation has not seen yet. A new chat that reuses an earlier first message starts a new
+  conversation when it sends fewer turns than the stored one, or when it does not repeat the
+  assistant's reply. See `docs/vscode-setup.md` section 5.
 - **Files.** Text files (`.py .md .txt .json .yaml .yml`) are inlined into the prompt, which
   suits coding agents. Images (`image_url` data URLs) are uploaded through Copilot's own
   upload endpoint and attached to the turn. `.docx`/`.pdf` are rejected — convert them to

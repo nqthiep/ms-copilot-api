@@ -51,6 +51,27 @@ log = get_logger("sydney-provider")
 RETRIABLE = (EmptyResponse, SydneyError)
 
 
+def client_turn_count(messages: list[NormalizedMessage]) -> int:
+    return sum(1 for m in messages if m.role in ("user", "tool"))
+
+
+def starts_new_chat(session_key: str, messages: list[NormalizedMessage], state: ThreadState) -> bool:
+    """True when this request cannot be a continuation of the stored conversation.
+
+    - The client holds fewer turns than the conversation: it began a new chat.
+    - An auto key (no client identifier) and the client did not echo the assistant's
+      earlier reply: a new chat that reuses the same first message. A client that
+      continues a conversation always resends the reply it received.
+
+    Requests with an explicit X-Session-Id are trusted, so a client that sends only
+    its newest message keeps one conversation.
+    """
+    if client_turn_count(messages) < state.sydney_turns:
+        return True
+    echoes_reply = any(m.role == "assistant" for m in messages)
+    return session_key.startswith("auto:") and state.sydney_turns > 0 and not echoes_reply
+
+
 class SydneyProvider(ChatProvider):
     """Runs each chat turn on the Sydney ChatHub, one request at a time."""
 
@@ -131,6 +152,15 @@ class SydneyProvider(ChatProvider):
         deadline = time.monotonic() + self._settings.request_timeout
         token = await self._ensure_token()
         state = self._store.get(session_key)
+        if state is not None and starts_new_chat(session_key, messages, state):
+            log.info(
+                "Session %s looks like a new chat (%d client turns, conversation holds %d); "
+                "starting a new Sydney conversation",
+                session_key,
+                client_turn_count(messages),
+                state.sydney_turns,
+            )
+            state = None
         conversation = SydneyConversation(
             session_id=(state.sydney_session_id if state else None) or "",
             conversation_id=(state.sydney_conversation_id if state else None) or "",
@@ -214,7 +244,7 @@ class SydneyProvider(ChatProvider):
                 ThreadState(
                     sydney_session_id=conversation.session_id,
                     sydney_conversation_id=conversation.conversation_id,
-                    sydney_turns=sent + len(pending),
+                    sydney_turns=client_turn_count(messages),
                 ),
             )
             self._auth_ready = True

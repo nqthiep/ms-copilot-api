@@ -226,9 +226,13 @@ class SydneyProvider(ChatProvider):
 
             reply = "".join(deltas)
             calls = self._extract_tool_calls(reply, tools) if use_tools else None
+            if use_tools and not calls and '"arguments"' in reply:
+                # The model tried to call a tool but the block did not parse. Say so in
+                # the log; the reply itself is still returned as text.
+                log.warning("Reply looks like a tool call but no valid call parsed; returned as text")
             if use_tools:
                 # Hide the fence; keep any surrounding prose as the content.
-                text_out = strip_tool_calls_block(reply) if calls else reply
+                text_out = strip_tool_calls_block(reply, tools or []) if calls else reply
                 if text_out:
                     yield TextDelta(text_out)
                 if calls:

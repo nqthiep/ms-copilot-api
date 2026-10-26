@@ -1,5 +1,7 @@
 """Tests for the tool-calling emulation (prompt preamble + parsing)."""
 
+import pytest
+
 from copilot_gateway.models.request import ToolDef
 from copilot_gateway.provider.prompt import NormalizedMessage, NormalizedToolCall
 from copilot_gateway.provider.tools import (
@@ -103,7 +105,7 @@ def test_parse_tool_calls_absent_block():
 def test_strip_tool_calls_block_keeps_prose():
     text = "Working on it.\n```tool_calls\n[]\n```\nAll done."
 
-    assert strip_tool_calls_block(text) == "Working on it.\n\nAll done."
+    assert strip_tool_calls_block(text, make_tools()) == "Working on it.\n\nAll done."
 
 
 def test_compile_first_turn_includes_system_history_and_preamble():
@@ -192,3 +194,34 @@ def test_compile_follow_up_with_new_user_message():
     assert "USER:\nfirst" not in turn
     assert "USER:\nsecond" in turn
     assert "Continue the task" not in turn
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Arguments sent as a JSON string, as OpenAI clients do.
+        '```tool_calls\n[{"name": "read_file", "arguments": "{\\"path\\": \\"a.py\\"}"}]\n```',
+        # OpenAI nesting: the call sits under "function".
+        '```tool_calls\n[{"function": {"name": "read_file", "arguments": {"path": "a.py"}}}]\n```',
+        # A single object instead of an array.
+        '```tool_calls\n{"name": "read_file", "arguments": {"path": "a.py"}}\n```',
+        # A json fence or a singular tag instead of tool_calls.
+        '```json\n[{"name": "read_file", "arguments": {"path": "a.py"}}]\n```',
+        '```tool_call\n[{"name": "read_file", "arguments": {"path": "a.py"}}]\n```',
+        # No newline between the tag and the block.
+        '```tool_calls [{"name": "read_file", "arguments": {"path": "a.py"}}]```',
+        # Stray whitespace around the tool name.
+        '```tool_calls\n[{"name": " read_file ", "arguments": {"path": "a.py"}}]\n```',
+    ],
+)
+def test_parse_tool_calls_accepts_common_model_variants(text):
+    calls = parse_tool_calls(text, make_tools())
+
+    assert [(c.name, c.arguments) for c in calls] == [("read_file", {"path": "a.py"})]
+
+
+def test_json_example_that_is_not_a_tool_call_stays_as_text():
+    text = 'Example config:\n```json\n{"name": "app", "port": 8000}\n```'
+
+    assert parse_tool_calls(text, make_tools()) is None
+    assert strip_tool_calls_block(text, make_tools()) == text

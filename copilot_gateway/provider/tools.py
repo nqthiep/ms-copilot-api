@@ -22,10 +22,10 @@ from copilot_gateway.models.request import ToolDef
 from copilot_gateway.provider.errors import BadRequest
 from copilot_gateway.provider.prompt import TEXT_EXTENSIONS, AttachedFile, NormalizedMessage
 
-TOOL_CALLS_FENCE = "tool_calls"
-_FENCE_RE = re.compile(
-    r"```" + TOOL_CALLS_FENCE + r"\s*\n(.*?)```", re.DOTALL | re.IGNORECASE
-)
+# Models drift from the requested format: a ```json or ```tool_call fence, a bare
+# object instead of an array, or a call nested under "function". All of these are
+# accepted. A block only counts when its calls name known tools.
+_FENCE_RE = re.compile(r"```(tool_calls?|json)[ \t]*\n?(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -91,37 +91,62 @@ def tools_active(tools: list[ToolDef] | None, tool_choice: object) -> bool:
     return _normalize_choice(tool_choice) != "none"
 
 
-def parse_tool_calls(text: str, tools: list[ToolDef]) -> list[ParsedToolCall] | None:
-    """Extract tool calls from a ```tool_calls fenced block.
-
-    Returns None when the model did not emit a well-formed block, so the
-    caller can fall back to plain text.
-    """
-    match = _FENCE_RE.search(text)
-    if not match:
-        return None
+def _parse_block(body: str, known: set[str]) -> list[ParsedToolCall] | None:
+    """The calls in one fenced block, or None when the block is not a tool call."""
     try:
-        raw = json.loads(match.group(1))
+        raw = json.loads(body)
     except json.JSONDecodeError:
         return None
-    if not isinstance(raw, list) or not raw:
-        return None
-    known = {tool.function.name for tool in tools}
+    items = raw if isinstance(raw, list) else [raw]
     calls: list[ParsedToolCall] = []
-    for item in raw:
+    for item in items:
         if not isinstance(item, dict):
             return None
-        name = item.get("name")
-        arguments = item.get("arguments", {})
+        inner = item["function"] if isinstance(item.get("function"), dict) else item
+        name = inner.get("name")
+        if isinstance(name, str):
+            name = name.strip()
+        arguments = inner.get("arguments", {})
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments) if arguments.strip() else {}
+            except json.JSONDecodeError:
+                return None
         if name not in known or not isinstance(arguments, dict):
             return None
         calls.append(ParsedToolCall(name=name, arguments=arguments))
     return calls or None
 
 
-def strip_tool_calls_block(text: str) -> str:
-    """Remove the ```tool_calls block, keeping any surrounding prose."""
-    return _FENCE_RE.sub("", text).strip()
+def parse_tool_calls(text: str, tools: list[ToolDef]) -> list[ParsedToolCall] | None:
+    """Extract tool calls from the fenced blocks in a reply.
+
+    Blocks that are not tool calls (a JSON example, for instance) are ignored.
+    Returns None when no block holds a valid call, so the caller can fall back to
+    plain text.
+    """
+    known = {tool.function.name for tool in tools}
+    calls: list[ParsedToolCall] = []
+    for match in _FENCE_RE.finditer(text):
+        calls.extend(_parse_block(match.group(2), known) or [])
+    return calls or None
+
+
+def strip_tool_calls_block(text: str, tools: list[ToolDef]) -> str:
+    """Remove the tool-call blocks, keeping the surrounding prose.
+
+    A block tagged tool_calls is always removed, even when malformed, so the user
+    never sees raw tool syntax. A json block is removed only when it holds calls.
+    """
+    known = {tool.function.name for tool in tools}
+
+    def drop_tool_block(match: re.Match[str]) -> str:
+        tag, body = match.group(1).lower(), match.group(2)
+        if tag != "json" or _parse_block(body, known):
+            return ""
+        return match.group(0)
+
+    return _FENCE_RE.sub(drop_tool_block, text).strip()
 
 
 def _inline_file(attachment: AttachedFile, max_chars: int) -> str:
